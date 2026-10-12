@@ -11,7 +11,7 @@ import logging
 import pandas as pd
 from fuzzywuzzy import process as fuzz_process
 
-from src.data.schema import CleanColumns, BUDGET_TIER_ORDER
+from src.data.schema import CleanColumns
 from src.input.models import UserPreferences
 
 logger = logging.getLogger("zomato_recommender.integration.filter")
@@ -180,11 +180,23 @@ def _filter_by_location_fuzzy(df: pd.DataFrame, location: str) -> pd.DataFrame:
     return df.head(0)  # Empty DataFrame
 
 
-def _filter_by_budget(df: pd.DataFrame, budget: int, party_size: int) -> pd.DataFrame:
+def _filter_by_budget(df: pd.DataFrame, budget: int | str, party_size: int = 2) -> pd.DataFrame:
     """Filter by numeric budget based on cost for two."""
     col = CleanColumns.COST_FOR_TWO
     if col not in df.columns:
         return df
+
+    # Resolve tier string to number if needed
+    if isinstance(budget, str):
+        tier_to_budget = {"low": 400, "medium": 1000, "high": 2500}
+        resolved = tier_to_budget.get(budget.strip().lower())
+        if resolved is not None:
+            budget = resolved
+        else:
+            try:
+                budget = int(float(budget.strip().replace("₹", "").replace(",", "")))
+            except (ValueError, TypeError):
+                return df
 
     # dataset cost is approx cost for two people
     # normalize the user's budget to a max acceptable "cost for two"
@@ -251,7 +263,19 @@ def _try_expanded_budget(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFra
     if col not in df.columns:
         return df
 
-    expanded_budget = int(prefs.budget * 1.5)
+    budget = prefs.budget
+    if isinstance(budget, str):
+        tier_to_budget = {"low": 400, "medium": 1000, "high": 2500}
+        resolved = tier_to_budget.get(budget.strip().lower())
+        if resolved is not None:
+            budget = resolved
+        else:
+            try:
+                budget = int(float(budget.strip().replace("₹", "").replace(",", "")))
+            except (ValueError, TypeError):
+                return df
+
+    expanded_budget = int(budget * 1.5)
     max_cost_for_two = (expanded_budget / max(1, prefs.party_size)) * 2
     
     mask = df[col] <= max_cost_for_two

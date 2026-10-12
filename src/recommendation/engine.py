@@ -9,7 +9,6 @@ import hashlib
 import json
 import logging
 import time
-from typing import Optional
 
 import pandas as pd
 
@@ -20,8 +19,8 @@ from src.integration.formatter import format_for_llm
 from src.integration.ranker import rank_and_select
 from src.recommendation.llm_client import (
     BaseLLMClient,
-    LLMError,
     LLMAuthError,
+    LLMError,
     call_with_retry,
     create_llm_client,
 )
@@ -41,35 +40,43 @@ logger = logging.getLogger("zomato_recommender.recommendation.engine")
 # ---------------------------------------------------------------------------
 # Response Cache
 # ---------------------------------------------------------------------------
-_response_cache: dict[str, tuple[RecommendationResult, float]] = {}
+_response_cache: dict[str, tuple[RecommendationResult, int, dict, float]] = {}
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
 
 def _cache_key(prefs: UserPreferences) -> str:
     """Generate a deterministic cache key from user preferences."""
-    data = json.dumps(prefs.to_dict(), sort_keys=True)
+    data_dict = prefs.to_dict()
+    if isinstance(data_dict.get("preferences"), list):
+        data_dict["preferences"] = sorted(str(p) for p in data_dict["preferences"])
+    data = json.dumps(data_dict, sort_keys=True)
     return hashlib.md5(data.encode()).hexdigest()
 
 
-def _get_cached(prefs: UserPreferences) -> Optional[RecommendationResult]:
+def _get_cached(prefs: UserPreferences) -> tuple[RecommendationResult, int, dict] | None:
     """Retrieve a cached result if it exists and hasn't expired."""
     key = _cache_key(prefs)
     if key in _response_cache:
-        result, timestamp = _response_cache[key]
+        result, candidates_found, metadata, timestamp = _response_cache[key]
         age = time.time() - timestamp
         if age < CACHE_TTL_SECONDS:
             logger.info(f"Cache hit (age: {age:.0f}s)")
-            return result
+            return result, candidates_found, metadata
         else:
             del _response_cache[key]
             logger.debug("Cache entry expired, removed.")
     return None
 
 
-def _set_cache(prefs: UserPreferences, result: RecommendationResult) -> None:
+def _set_cache(
+    prefs: UserPreferences,
+    result: RecommendationResult,
+    candidates_found: int = 0,
+    metadata: dict | None = None,
+) -> None:
     """Store a result in the cache."""
     key = _cache_key(prefs)
-    _response_cache[key] = (result, time.time())
+    _response_cache[key] = (result, candidates_found, metadata or {}, time.time())
     logger.debug(f"Result cached (key: {key[:8]}...)")
 
 
@@ -109,13 +116,16 @@ def get_recommendations(
     if use_cache:
         cached = _get_cached(prefs)
         if cached:
+            cached_result, cached_candidates, cached_meta = cached
             elapsed = (time.time() - start_time) * 1000
+            meta_with_cache = dict(cached_meta)
+            meta_with_cache["source"] = "cache"
             return {
-                "result": cached,
-                "metadata": {"source": "cache"},
-                "model_used": cached.model_used,
+                "result": cached_result,
+                "metadata": meta_with_cache,
+                "model_used": cached_result.model_used,
                 "response_time_ms": round(elapsed),
-                "candidates_found": 0,
+                "candidates_found": cached_candidates,
                 "cached": True,
             }
 
@@ -161,7 +171,7 @@ def get_recommendations(
 
     # Cache the result
     if use_cache:
-        _set_cache(prefs, result)
+        _set_cache(prefs, result, len(filtered), filter_metadata)
 
     elapsed = (time.time() - start_time) * 1000
     logger.info(
@@ -218,7 +228,7 @@ def _try_provider(
     client: BaseLLMClient,
     prompt: dict[str, str],
     candidates_df: pd.DataFrame,
-) -> tuple[Optional[RecommendationResult], str]:
+) -> tuple[RecommendationResult | None, str]:
     """
     Try a single LLM provider: call -> parse, with one retry on parse failure.
     """
@@ -276,7 +286,8 @@ def _rule_based_fallback(candidates_df: pd.DataFrame) -> RecommendationResult:
     for idx, (_, row) in enumerate(candidates_df.head(max_recs).iterrows(), start=1):
         name = row.get("restaurant_name", "Unknown")
         cuisine = row.get("cuisines", "N/A")
-        rating = float(row.get("rating", 0) or 0)
+        raw_rating = row.get("rating", 0)
+        rating = float(raw_rating) if pd.notna(raw_rating) else 0.0
         cost = row.get("cost_for_two", 0)
         cost_str = f"Rs.{int(cost)} for two" if pd.notna(cost) else "Price N/A"
 

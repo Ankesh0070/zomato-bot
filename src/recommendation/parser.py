@@ -16,7 +16,6 @@ import json
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Optional
 
 import pandas as pd
 
@@ -72,7 +71,6 @@ class RecommendationResult:
 # ---------------------------------------------------------------------------
 class ParseError(Exception):
     """Raised when the LLM response cannot be parsed."""
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +78,7 @@ class ParseError(Exception):
 # ---------------------------------------------------------------------------
 def parse_response(
     raw_response: str,
-    candidates_df: Optional[pd.DataFrame] = None,
+    candidates_df: pd.DataFrame | None = None,
     max_recommendations: int = 5,
 ) -> RecommendationResult:
     """
@@ -231,11 +229,9 @@ def _find_recommendations_array(data: dict) -> list[dict]:
 
     # Try to find any list value in the dict
     for key, value in data.items():
-        if isinstance(value, list) and len(value) > 0:
-            # Check if items look like recommendations
-            if isinstance(value[0], dict):
-                logger.info(f"Found recommendations under non-standard key '{key}'")
-                return value
+        if isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
+            logger.info(f"Found recommendations under non-standard key '{key}'")
+            return value
 
     return []
 
@@ -322,15 +318,18 @@ def _check_hallucinations(
     if CleanColumns.RESTAURANT_NAME not in candidates_df.columns:
         return recommendations
 
-    candidate_names = set(
-        candidates_df[CleanColumns.RESTAURANT_NAME].str.lower().str.strip().tolist()
-    )
+    candidate_lookup = {
+        name.lower().strip(): name
+        for name in candidates_df[CleanColumns.RESTAURANT_NAME].dropna()
+    }
+    candidate_names = set(candidate_lookup.keys())
 
     valid = []
     for rec in recommendations:
         rec_name_lower = rec.restaurant_name.lower().strip()
 
         if rec_name_lower in candidate_names:
+            rec.restaurant_name = candidate_lookup[rec_name_lower]
             valid.append(rec)
         else:
             # Fuzzy check — the LLM might slightly modify the name
@@ -339,7 +338,7 @@ def _check_hallucinations(
                 logger.info(
                     f"Corrected hallucinated name: '{rec.restaurant_name}' -> '{best_match}'"
                 )
-                rec.restaurant_name = best_match.title()
+                rec.restaurant_name = candidate_lookup[best_match]
                 valid.append(rec)
             else:
                 logger.warning(
@@ -352,7 +351,7 @@ def _check_hallucinations(
 
 def _find_closest_name(
     name: str, candidate_names: set[str], threshold: float = 0.8
-) -> Optional[str]:
+) -> str | None:
     """Find the closest matching candidate name using simple ratio."""
     from fuzzywuzzy import fuzz
 

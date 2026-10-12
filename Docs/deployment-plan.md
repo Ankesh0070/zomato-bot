@@ -69,7 +69,7 @@ GROQ_API_KEY = "your_actual_groq_api_key_here"
 
 # Optional Overrides (Use if you want to change default values)
 LLM_PROVIDER = "groq"
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-120b"
 LLM_TEMPERATURE = 0.3
 LLM_MAX_TOKENS = 2048
 HF_DATASET_NAME = "ManikaSaini/zomato-restaurant-recommendation"

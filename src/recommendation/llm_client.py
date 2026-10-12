@@ -8,7 +8,6 @@ with retry logic, rate limit handling, and error management.
 import logging
 import time
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from src.config import LLMConfig
 
@@ -20,22 +19,18 @@ logger = logging.getLogger("zomato_recommender.recommendation.llm_client")
 # ---------------------------------------------------------------------------
 class LLMError(Exception):
     """Base exception for LLM-related errors."""
-    pass
 
 
 class LLMTimeoutError(LLMError):
     """Raised when the LLM API call times out."""
-    pass
 
 
 class LLMRateLimitError(LLMError):
     """Raised when the LLM API returns a rate limit error (429)."""
-    pass
 
 
 class LLMAuthError(LLMError):
     """Raised when the API key is missing or invalid."""
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -64,12 +59,10 @@ class BaseLLMClient(ABC):
         Raises:
             LLMError: On any API failure.
         """
-        pass
 
     @abstractmethod
     def is_available(self) -> bool:
         """Check if this client is configured and ready to use."""
-        pass
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(model={self.model})"
@@ -78,15 +71,22 @@ class BaseLLMClient(ABC):
 # ---------------------------------------------------------------------------
 # Groq Client
 # ---------------------------------------------------------------------------
+FALLBACK_MODELS = [
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "qwen/qwen3.8-27b",
+]
+
+
 class GroqClient(BaseLLMClient):
     """Groq API client — ultra-fast LLM inference."""
 
     def __init__(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "openai/gpt-oss-120b",
         temperature: float = 0.3,
         max_tokens: int = 2048,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         super().__init__(model, temperature, max_tokens)
         self._api_key = api_key or LLMConfig.groq_api_key()
@@ -135,11 +135,34 @@ class GroqClient(BaseLLMClient):
             raise
         except Exception as e:
             error_str = str(e).lower()
+            # If model is not found / does not exist, try supported fallback models
+            if "model_not_found" in error_str or "does not exist" in error_str or "404" in str(e):
+                logger.warning(f"Model '{self.model}' not found on Groq. Attempting fallback models...")
+                client = self._get_client()
+                for fallback in FALLBACK_MODELS:
+                    if fallback != self.model:
+                        try:
+                            logger.info(f"Trying fallback model: {fallback}")
+                            fb_resp = client.chat.completions.create(
+                                model=fallback,
+                                messages=messages,
+                                temperature=self.temperature,
+                                max_tokens=self.max_tokens,
+                                response_format={"type": "json_object"},
+                            )
+                            fb_text = fb_resp.choices[0].message.content
+                            if fb_text:
+                                logger.info(f"Fallback to {fallback} succeeded.")
+                                self.model = fallback
+                                return fb_text
+                        except Exception as fb_err:
+                            logger.warning(f"Fallback model {fallback} failed: {fb_err}")
+
             if "429" in str(e) or "rate" in error_str or "quota" in error_str:
                 raise LLMRateLimitError(f"Groq rate limit: {e}") from e
             if "timeout" in error_str or "deadline" in error_str:
                 raise LLMTimeoutError(f"Groq timeout: {e}") from e
-            if "401" in str(e) or "invalid" in error_str and "key" in error_str:
+            if "401" in str(e) or "403" in str(e) or "unauthorized" in error_str or ("invalid" in error_str and "key" in error_str):
                 raise LLMAuthError(f"Groq auth error: {e}") from e
             raise LLMError(f"Groq error: {e}") from e
 

@@ -7,9 +7,9 @@ An AI-powered restaurant recommendation system that combines structured Zomato r
 ## 🎯 Features
 
 - **Smart Filtering** — Narrows 50k+ restaurants by location, budget, cuisine, and rating
-- **LLM-Powered Ranking** — Uses Gemini / OpenAI to rank and explain recommendations
+- **LLM-Powered Ranking** — Uses Groq AI to rank and explain recommendations
 - **Natural Language Explanations** — Each suggestion comes with a personalized reason
-- **Interactive Web UI** — Streamlit-based interface for easy preference input
+- **Interactive Web UI** — Streamlit and FastAPI + React interfaces for easy preference input
 - **Fallback & Resilience** — Automatic retry, model fallback, and filter relaxation
 
 ---
@@ -31,7 +31,7 @@ See [Docs/architecture.md](Docs/architecture.md) for the full system design.
 ### Prerequisites
 
 - **Python 3.11+**
-- A **Gemini API key** (free) or **OpenAI API key**
+- A **Groq API key** (free from https://console.groq.com/keys)
 
 ### 1. Clone & Install
 
@@ -121,11 +121,11 @@ All settings are managed via environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `GEMINI_API_KEY` | — | Google Gemini API key (primary) |
-| `OPENAI_API_KEY` | — | OpenAI API key (fallback) |
-| `LLM_PROVIDER` | `gemini` | Which LLM provider to use |
-| `LLM_MODEL` | `gemini-2.0-flash` | Specific model name |
+| `GROQ_API_KEY` | — | Groq API key |
+| `LLM_PROVIDER` | `groq` | Which LLM provider to use |
+| `LLM_MODEL` | `openai/gpt-oss-120b` | Specific model name |
 | `LLM_TEMPERATURE` | `0.3` | LLM creativity (0=deterministic, 1=creative) |
+| `LLM_MAX_TOKENS` | `2048` | Maximum token limit |
 | `TOP_K_CANDIDATES` | `20` | Max restaurants sent to LLM |
 | `MAX_RECOMMENDATIONS` | `5` | Number of final recommendations |
 
@@ -137,7 +137,7 @@ This project is for educational purposes.
 
 ---
 
-*Built with ❤️ using Python, Streamlit, and Gemini AI*
+*Built with ❤️ using Python, Streamlit, FastAPI, and Groq AI*
 
 ## ✅ Deployment
 

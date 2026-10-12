@@ -14,37 +14,33 @@ Tests cover:
 import json
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data.schema import CleanColumns, RawColumns
 from src.data.preprocessing import preprocess
+from src.data.schema import RawColumns
 from src.input.models import UserPreferences
-from src.recommendation.prompt_builder import (
-    build_prompt,
-    build_retry_prompt,
-    estimate_prompt_tokens,
-    SYSTEM_PROMPT,
-)
-from src.recommendation.parser import (
-    ParseError,
-    Recommendation,
-    RecommendationResult,
-    parse_response,
-    _extract_json,
-    _find_recommendations_array,
-    _parse_single_recommendation,
-)
 from src.recommendation.engine import (
     _cache_key,
     _rule_based_fallback,
     clear_cache,
 )
-
+from src.recommendation.parser import (
+    ParseError,
+    _extract_json,
+    _find_recommendations_array,
+    _parse_single_recommendation,
+    parse_response,
+)
+from src.recommendation.prompt_builder import (
+    SYSTEM_PROMPT,
+    build_prompt,
+    build_retry_prompt,
+    estimate_prompt_tokens,
+)
 
 # ===================================================================
 # Test Fixtures

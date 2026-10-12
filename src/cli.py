@@ -6,17 +6,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import setup_logging, validate_config
 from src.data.ingestion import download_dataset
-from src.data.preprocessing import preprocess
-from src.data.preprocessing import preprocess
-from src.input.validator import validate_and_normalize
-from src.recommendation.engine import get_recommendations
-from src.presentation.cli_display import (
-    render_header,
-    render_summary,
-    render_recommendations,
-    render_error,
-    render_no_results
+from src.data.preprocessing import (
+    get_unique_cuisines,
+    get_unique_locations,
+    preprocess,
 )
+from src.input.validator import validate_and_normalize
+from src.presentation.cli_display import (
+    render_error,
+    render_header,
+    render_no_results,
+    render_recommendations,
+    render_summary,
+)
+from src.recommendation.engine import get_recommendations
+
 
 def main():
     parser = argparse.ArgumentParser(description="Zomato AI Recommender CLI")
@@ -44,7 +48,6 @@ def main():
         render_error(f"Failed to load dataset: {e}")
         return
 
-    from src.data.preprocessing import get_unique_locations, get_unique_cuisines
     known_locations = get_unique_locations(df)
     known_cuisines = get_unique_cuisines(df)
 

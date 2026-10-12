@@ -12,9 +12,9 @@ import numpy as np
 import pandas as pd
 
 from src.data.schema import (
+    REQUIRED_COLUMNS,
     CleanColumns,
     RawColumns,
-    REQUIRED_COLUMNS,
     get_budget_tier,
 )
 
@@ -56,7 +56,10 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     # Step 3: Parse costs
     df = _parse_costs(df)
 
-    # Step 4: Normalize text fields
+    # Step 4: Parse votes
+    df = _parse_votes(df)
+
+    # Step 5: Normalize text fields
     df = _normalize_text(df)
 
     # Step 5: Derive new columns
@@ -217,6 +220,40 @@ def _parse_costs(df: pd.DataFrame) -> pd.DataFrame:
         logger.info(f"Costs: {new_nulls:,} unparseable values set to NaN.")
 
     return df
+
+
+# ---------------------------------------------------------------------------
+# Step 4: Parse votes
+# ---------------------------------------------------------------------------
+def _parse_vote_value(value) -> int:
+    """
+    Parse a single vote count to a clean non-negative integer.
+
+    Handles formats: 100, '100', '1,200', '0', None, NaN, etc.
+    """
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return 0
+
+    value_str = str(value).strip()
+    value_str = re.sub(r"[,\s]", "", value_str)
+
+    try:
+        vote = int(float(value_str))
+        return max(0, vote)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _parse_votes(df: pd.DataFrame) -> pd.DataFrame:
+    """Parse the vote column to clean integers."""
+    col = CleanColumns.VOTES
+    if col not in df.columns:
+        return df
+
+    df[col] = df[col].apply(_parse_vote_value)
+    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+    return df
+
 
 
 # ---------------------------------------------------------------------------
@@ -383,7 +420,8 @@ def get_unique_locations(df: pd.DataFrame) -> list[str]:
     col = CleanColumns.LOCATION
     if col not in df.columns:
         return []
-    return sorted(df[col].dropna().unique().tolist())
+    locs = df[col].dropna().unique().tolist()
+    return sorted(loc for loc in locs if loc and str(loc).strip() and str(loc).lower() != "nan")
 
 
 def get_unique_cuisines(df: pd.DataFrame) -> list[str]:
@@ -395,7 +433,9 @@ def get_unique_cuisines(df: pd.DataFrame) -> list[str]:
     all_cuisines = set()
     for cuisine_list in df[col].dropna():
         if isinstance(cuisine_list, list):
-            all_cuisines.update(cuisine_list)
+            for c in cuisine_list:
+                if c and str(c).strip() and str(c).lower() != "nan":
+                    all_cuisines.add(str(c).strip())
 
     return sorted(all_cuisines)
 

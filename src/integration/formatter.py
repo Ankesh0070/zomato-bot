@@ -64,10 +64,11 @@ def format_for_llm(
 
 def _format_user_preferences(prefs: UserPreferences) -> str:
     """Format user preferences into natural language context."""
+    budget_desc = f"{prefs.budget}" if prefs.budget else "Flexible (no specific limit)"
     lines = [
         "User Preferences:",
         f"- Location: {prefs.location}",
-        f"- Budget: {prefs.budget}",
+        f"- Budget: {budget_desc}",
     ]
 
     if prefs.cuisine:

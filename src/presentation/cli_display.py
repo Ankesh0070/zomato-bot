@@ -5,6 +5,7 @@ Provides functions for rendering recommendations in a terminal environment.
 
 from src.recommendation.parser import RecommendationResult
 
+
 def render_header():
     """Render the CLI header."""
     print("=" * 60)

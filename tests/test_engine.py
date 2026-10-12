@@ -1,14 +1,15 @@
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import json
+
 import pandas as pd
 
 from src.data.schema import CleanColumns
 from src.input.models import UserPreferences
-from src.recommendation.engine import get_recommendations, clear_cache
-from src.recommendation import llm_client
+from src.recommendation.engine import clear_cache, get_recommendations
 from src.recommendation.llm_client import BaseLLMClient
 
 

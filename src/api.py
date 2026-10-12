@@ -1,23 +1,23 @@
+import logging
 import sys
 import time
-import logging
 from pathlib import Path
-from functools import lru_cache
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import Optional
-import pandas as pd
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
+from src.config import setup_logging
 from src.data.ingestion import download_dataset
-from src.data.preprocessing import preprocess, get_unique_locations, get_unique_cuisines
+from src.data.preprocessing import get_unique_cuisines, get_unique_locations, preprocess
 from src.input.validator import validate_and_normalize
 from src.recommendation.engine import get_recommendations
-from src.config import setup_logging
 
 # Setup logging
 setup_logging()
@@ -41,57 +41,79 @@ df = None
 _cached_locations = None
 _cached_cuisines = None
 
-@app.on_event("startup")
 def load_data():
     global df, _cached_locations, _cached_cuisines
+    if df is not None:
+        return
     try:
         logger.info("Loading Zomato dataset...")
         start = time.perf_counter()
-        raw_df = download_dataset()
-        logger.info(f"Pre-processing {len(raw_df)} records...")
-        df = preprocess(raw_df)
+        clean_path = Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet"
+        if clean_path.exists():
+            logger.info(f"Loading preprocessed dataset from {clean_path}...")
+            df = pd.read_parquet(clean_path)
+        else:
+            raw_df = download_dataset()
+            logger.info(f"Pre-processing {len(raw_df)} records...")
+            df = preprocess(raw_df)
         # Pre-compute and cache location/cuisine lists
         _cached_locations = get_unique_locations(df)
         _cached_cuisines = get_unique_cuisines(df)
         elapsed = (time.perf_counter() - start) * 1000
         logger.info(f"Data loaded successfully: {len(df)} records ready in {elapsed:.0f}ms.")
-    except Exception as e:
-        logger.exception(f"Error loading dataset: {e}")
-        raise e
+    except Exception:
+        logger.exception("Error loading dataset")
+        raise
 
-# Mount the static directory for the React SPA
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+@app.on_event("startup")
+def on_startup():
+    load_data()
+
+def ensure_data_loaded():
+    if df is None:
+        load_data()
+
+# Mount static directory for the React SPA (supports root, public, and frontend)
+_project_root = Path(__file__).resolve().parent.parent
+_static_dir = _project_root / "public" / "static" if (_project_root / "public" / "static").exists() else _project_root / "frontend"
+_index_file = _project_root / "public" / "index.html" if (_project_root / "public" / "index.html").exists() else _project_root / "frontend" / "index.html"
+
+app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 @app.get("/")
 def read_root():
-    return FileResponse("frontend/index.html")
+    return FileResponse(str(_index_file))
 
 class RecommendRequest(BaseModel):
     location: str
-    budget: Optional[int] = None
+    budget: int | None = None
     party_size: int = 2
-    cuisine: Optional[str] = None
+    cuisine: str | None = None
     min_rating: float = 3.5
-    preferences: list[str] = []
+    preferences: list[str] = Field(default_factory=list)
 
 @app.get("/api/health")
 def health():
+    ensure_data_loaded()
     return {"status": "ok", "records_loaded": len(df) if df is not None else 0}
 
 @app.get("/api/locations")
 def get_locations():
+    ensure_data_loaded()
     if _cached_locations is None:
         raise HTTPException(status_code=500, detail="Data not loaded yet")
     return _cached_locations
 
 @app.get("/api/cuisines")
 def get_cuisines():
+    ensure_data_loaded()
     if _cached_cuisines is None:
         raise HTTPException(status_code=500, detail="Data not loaded yet")
     return _cached_cuisines
 
 @app.post("/api/recommend")
 def recommend(req: RecommendRequest):
+    ensure_data_loaded()
     if df is None:
         raise HTTPException(status_code=500, detail="Data not loaded yet")
     
@@ -142,10 +164,14 @@ def recommend(req: RecommendRequest):
         if not matches.empty:
             loc_matches = matches[matches['location'].str.lower() == validated.location.lower()]
             row = loc_matches.iloc[0] if not loc_matches.empty else matches.iloc[0]
-            votes = int(row.get('votes', 0))
-            cost_val = int(row.get('cost_for_two', 0))
-            online_order = bool(row.get('online_order', False))
-            book_table = bool(row.get('book_table', False))
+            raw_votes = row.get('votes', 0)
+            votes = int(raw_votes) if pd.notna(raw_votes) else 0
+
+            raw_cost = row.get('cost_for_two', 0)
+            cost_val = int(raw_cost) if pd.notna(raw_cost) else 0
+
+            online_order = bool(row.get('online_order', False)) if pd.notna(row.get('online_order')) else False
+            book_table = bool(row.get('book_table', False)) if pd.notna(row.get('book_table')) else False
             restaurant_type = str(row.get('restaurant_type', 'Casual Dining'))
             
         recs.append({

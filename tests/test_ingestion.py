@@ -14,29 +14,26 @@ Tests cover:
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
 # Ensure project root is on path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from src.data.preprocessing import (
+    _parse_cost_value,
+    _parse_rating_value,
+    _split_cuisines,
+    get_unique_cuisines,
+    get_unique_locations,
+    preprocess,
+)
 from src.data.schema import (
     CleanColumns,
     RawColumns,
-    BUDGET_TIERS,
-    get_budget_tier,
     Restaurant,
+    get_budget_tier,
 )
-from src.data.preprocessing import (
-    preprocess,
-    _parse_rating_value,
-    _parse_cost_value,
-    _split_cuisines,
-    get_unique_locations,
-    get_unique_cuisines,
-)
-
 
 # ===================================================================
 # Schema Tests

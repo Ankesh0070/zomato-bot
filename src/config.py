@@ -5,10 +5,11 @@ Loads settings from environment variables (.env file) and exposes them
 as typed, validated properties. Centralizes all configuration in one place.
 """
 
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------------------------
@@ -53,7 +54,7 @@ class LLMConfig:
         return None
 
     PROVIDER: str = os.getenv("LLM_PROVIDER", "groq")
-    MODEL: str = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
+    MODEL: str = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
     TEMPERATURE: float = float(os.getenv("LLM_TEMPERATURE", "0.3"))
     MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2048"))
 
@@ -141,7 +142,7 @@ def setup_logging() -> logging.Logger:
                             payload[k] = v
                         except Exception:
                             payload[k] = str(v)
-                return _json.dumps(payload, ensure_ascii=False)
+                return _json.dumps(payload, ensure_ascii=True)
 
         handler.setFormatter(_StructuredFormatter())
         logger.addHandler(handler)

@@ -11,11 +11,11 @@ Provides functions for rendering:
 - Footer
 """
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 
-from src.data.preprocessing import get_unique_locations, get_unique_cuisines
-from src.input.models import VALID_BUDGETS, VALID_PREFERENCES
+from src.data.preprocessing import get_unique_cuisines, get_unique_locations
+from src.input.models import VALID_PREFERENCES
 from src.recommendation.parser import RecommendationResult
 
 
@@ -208,7 +208,7 @@ def _render_single_card(rec):
             st.markdown("---")
             
             # Interactive Buttons
-            col1, col2, col3 = st.columns([1, 1, 2])
+            col1, col2, _col3 = st.columns([1, 1, 2])
             with col1:
                 if st.button("🍽️ Book Table", key=f"book_{rank}_{rec.restaurant_name}"):
                     st.toast(f"Redirecting to Zomato booking for {rec.restaurant_name}...", icon="🍽️")

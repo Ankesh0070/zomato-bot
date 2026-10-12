@@ -10,6 +10,7 @@ Main entry point. Orchestrates:
 """
 
 import logging
+
 import streamlit as st
 
 # -- Page config must be the FIRST Streamlit command --
@@ -23,29 +24,33 @@ st.set_page_config(
     },
 )
 
-import sys  # noqa: E402
-from pathlib import Path  # noqa: E402
+import sys
+from pathlib import Path
 
 # Ensure project root is on the path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.config import setup_logging, validate_config  # noqa: E402
-from src.data.ingestion import download_dataset  # noqa: E402
-from src.data.preprocessing import preprocess  # noqa: E402
-from src.input.validator import validate_and_normalize  # noqa: E402
-from src.recommendation.engine import get_recommendations  # noqa: E402
-from src.presentation.styles import get_custom_css  # noqa: E402
-from src.presentation.renderer import (  # noqa: E402
-    render_header,
-    render_sidebar,
-    render_summary,
-    render_recommendations,
-    render_warnings,
+from src.config import setup_logging, validate_config
+from src.data.ingestion import download_dataset
+from src.data.preprocessing import (
+    get_unique_cuisines,
+    get_unique_locations,
+    preprocess,
+)
+from src.input.validator import validate_and_normalize
+from src.presentation.renderer import (
     render_empty_state,
-    render_no_results,
     render_error,
     render_footer,
+    render_header,
+    render_no_results,
+    render_recommendations,
+    render_sidebar,
+    render_summary,
+    render_warnings,
 )
+from src.presentation.styles import get_custom_css
+from src.recommendation.engine import get_recommendations
 
 # Setup logging
 setup_logging()
@@ -119,7 +124,6 @@ def _handle_recommendation_request(df, inputs: dict):
     """Handle the full recommendation flow when user clicks the button."""
 
     # Validate & normalize using the validator (with dataset context)
-    from src.data.preprocessing import get_unique_locations, get_unique_cuisines
     known_locations = get_unique_locations(df)
     known_cuisines = get_unique_cuisines(df)
 
@@ -137,6 +141,9 @@ def _handle_recommendation_request(df, inputs: dict):
     except ValueError as e:
         render_error(str(e))
         return
+
+    if validation_warnings:
+        render_warnings(validation_warnings)
 
     # Run the pipeline
     with st.spinner("🤖 AI is analyzing restaurants..."):

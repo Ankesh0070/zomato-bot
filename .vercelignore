@@ -1,0 +1,13 @@
+# Prevent Vercel from treating Streamlit entrypoint as a serverless function
+src/main.py
+
+# Ignore tests, dev virtual environments, and raw large datasets
+tests/
+venv/
+.venv/
+.streamlit/
+data/cache/
+data/zomato_dataset.parquet
+*.csv
+.pytest_cache/
+.ruff_cache/

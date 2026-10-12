@@ -7,11 +7,10 @@ formats and is safe to use in the filtering and LLM pipelines.
 
 import logging
 import re
-from typing import Optional
 
 from fuzzywuzzy import process as fuzz_process
 
-from src.input.models import UserPreferences, VALID_BUDGETS
+from src.input.models import UserPreferences
 
 logger = logging.getLogger("zomato_recommender.input.validator")
 
@@ -53,11 +52,11 @@ def validate_and_normalize(
     location: str,
     budget: int | None = None,
     party_size: int = 2,
-    cuisine: Optional[str] = None,
+    cuisine: str | None = None,
     min_rating: float = 3.5,
-    preferences: Optional[list[str]] = None,
-    known_locations: Optional[list[str]] = None,
-    known_cuisines: Optional[list[str]] = None,
+    preferences: list[str] | None = None,
+    known_locations: list[str] | None = None,
+    known_cuisines: list[str] | None = None,
 ) -> tuple[UserPreferences, list[str]]:
     """
     Validate and normalize user input into a UserPreferences object.
@@ -124,7 +123,7 @@ def validate_and_normalize(
 # ---------------------------------------------------------------------------
 def _validate_location(
     location: str,
-    known_locations: Optional[list[str]] = None,
+    known_locations: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     """Validate and normalize location input."""
     warnings: list[str] = []
@@ -177,8 +176,16 @@ def _validate_budget(budget) -> tuple[int | None, list[str]]:
     if budget is None or str(budget).strip() == "":
         return None, warnings
 
+    # Map tier names to standard numeric budget caps
+    if isinstance(budget, str):
+        tier = budget.strip().lower()
+        tier_to_budget = {"low": 400, "medium": 1000, "high": 2500}
+        if tier in tier_to_budget:
+            return tier_to_budget[tier], warnings
+
     try:
-        b = int(budget)
+        clean_str = str(budget).strip().replace("₹", "").replace(",", "")
+        b = int(float(clean_str))
         if b < 0:
             warnings.append("Budget cannot be negative. Ignoring budget constraint.")
             return None, warnings
@@ -209,9 +216,9 @@ def _validate_party_size(party_size) -> tuple[int, list[str]]:
 # Cuisine validation
 # ---------------------------------------------------------------------------
 def _validate_cuisine(
-    cuisine: Optional[str],
-    known_cuisines: Optional[list[str]] = None,
-) -> tuple[Optional[str], list[str]]:
+    cuisine: str | None,
+    known_cuisines: list[str] | None = None,
+) -> tuple[str | None, list[str]]:
     """Validate and normalize cuisine input."""
     warnings: list[str] = []
 
@@ -324,7 +331,7 @@ def _fuzzy_match(
     query: str,
     candidates: list[str],
     threshold: int = 60,
-) -> tuple[Optional[str], int]:
+) -> tuple[str | None, int]:
     """
     Find the best fuzzy match for a query in a list of candidates.
 

@@ -12,31 +12,29 @@ Tests cover:
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.data.schema import CleanColumns, RawColumns
 from src.data.preprocessing import preprocess
+from src.data.schema import CleanColumns, RawColumns
 from src.input.models import UserPreferences
 from src.input.validator import (
-    validate_and_normalize,
     _sanitize_text,
     _validate_budget,
     _validate_rating,
+    validate_and_normalize,
 )
 from src.integration.filter import (
-    apply_filters,
-    _filter_by_location,
     _filter_by_budget,
     _filter_by_cuisine,
+    _filter_by_location,
     _filter_by_rating,
+    apply_filters,
 )
-from src.integration.ranker import rank_and_select, _compute_score
-from src.integration.formatter import format_for_llm, estimate_token_count
-
+from src.integration.formatter import estimate_token_count, format_for_llm
+from src.integration.ranker import _compute_score, rank_and_select
 
 # ===================================================================
 # Test Fixtures

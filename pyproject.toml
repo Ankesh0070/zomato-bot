@@ -1,0 +1,8 @@
+[project]
+name = "zomato-bot"
+version = "0.1.0"
+description = "Zomato AI Restaurant Recommender"
+requires-python = ">=3.11"
+
+[tool.vercel]
+entrypoint = "src.api:app"

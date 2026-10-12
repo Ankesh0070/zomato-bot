@@ -6,13 +6,12 @@ objects, suitable for use by the Streamlit UI or CLI interfaces.
 """
 
 import logging
-from typing import Optional
 
 import pandas as pd
 
-from src.data.preprocessing import get_unique_locations, get_unique_cuisines
+from src.data.preprocessing import get_unique_cuisines, get_unique_locations
 from src.data.schema import CleanColumns
-from src.input.models import UserPreferences, VALID_BUDGETS, VALID_PREFERENCES
+from src.input.models import VALID_BUDGETS, VALID_PREFERENCES, UserPreferences
 from src.input.validator import validate_and_normalize
 
 logger = logging.getLogger("zomato_recommender.input.collector")
@@ -66,17 +65,19 @@ class PreferenceCollector:
     def collect(
         self,
         location: str,
-        budget: str = "medium",
-        cuisine: Optional[str] = None,
+        budget: int | str | None = 1000,
+        party_size: int = 2,
+        cuisine: str | None = None,
         min_rating: float = 3.5,
-        preferences: Optional[list[str]] = None,
+        preferences: list[str] | None = None,
     ) -> tuple[UserPreferences, list[str]]:
         """
         Validate inputs and return a UserPreferences object.
 
         Args:
             location: City or area name.
-            budget: Budget tier.
+            budget: Budget amount or tier.
+            party_size: Number of people in the party.
             cuisine: Preferred cuisine (optional).
             min_rating: Minimum acceptable rating.
             preferences: Additional preference tags.
@@ -90,6 +91,7 @@ class PreferenceCollector:
         return validate_and_normalize(
             location=location,
             budget=budget,
+            party_size=party_size,
             cuisine=cuisine,
             min_rating=min_rating,
             preferences=preferences,

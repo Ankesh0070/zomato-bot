@@ -25,6 +25,7 @@ ENV/
 
 # Cached Dataset
 data/*.parquet
+!data/restaurants_clean.parquet
 data/*.csv
 data/*.json
 data/cache/

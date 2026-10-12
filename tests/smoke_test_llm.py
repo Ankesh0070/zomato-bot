@@ -1,10 +1,11 @@
 """Quick smoke test: verify Groq LLM call works end-to-end."""
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.config import setup_logging
-from src.recommendation.llm_client import create_llm_client, call_with_retry
+from src.recommendation.llm_client import call_with_retry, create_llm_client
 
 setup_logging()
 
@@ -25,7 +26,7 @@ response = call_with_retry(
 )
 
 print(f"\n  [OK] Response received ({len(response)} chars)")
-print(f"\n  Response:")
+print("\n  Response:")
 print(f"  {response[:500]}")
 print("\n" + "=" * 60)
 print("  Groq LLM connection is WORKING!")

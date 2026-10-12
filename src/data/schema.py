@@ -64,7 +64,7 @@ BUDGET_TIERS = {
 BUDGET_TIER_ORDER = ["low", "medium", "high"]
 
 
-def get_budget_tier(cost: float | int | None) -> str | None:
+def get_budget_tier(cost: float | None) -> str | None:
     """
     Map a cost-for-two value to a budget tier.
 

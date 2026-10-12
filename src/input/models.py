@@ -6,8 +6,6 @@ to represent what the user is looking for in a restaurant.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
-
 
 # Valid values for constrained fields
 VALID_BUDGETS = ("low", "medium", "high")
@@ -46,7 +44,7 @@ class UserPreferences:
     location: str
     budget: int | None = None
     party_size: int = 2
-    cuisine: Optional[str] = None
+    cuisine: str | None = None
     min_rating: float = 3.5
     preferences: list[str] = field(default_factory=list)
 
