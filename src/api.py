@@ -40,9 +40,10 @@ df = None
 # Cached location/cuisine lists (computed once after data load)
 _cached_locations = None
 _cached_cuisines = None
+_load_error = None
 
 def load_data():
-    global df, _cached_locations, _cached_cuisines
+    global df, _cached_locations, _cached_cuisines, _load_error
     if df is not None:
         return
     try:
@@ -94,9 +95,11 @@ def load_data():
         _cached_cuisines = get_unique_cuisines(df)
         elapsed = (time.perf_counter() - start) * 1000
         logger.info(f"Data loaded successfully: {len(df)} records, {len(_cached_locations)} locations, {len(_cached_cuisines)} cuisines ready in {elapsed:.0f}ms.")
-    except Exception:
+        _load_error = None
+    except Exception as e:
+        import traceback
+        _load_error = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
         logger.exception("Error loading dataset")
-        raise
 
 @app.on_event("startup")
 def on_startup():
@@ -111,11 +114,14 @@ _project_root = Path(__file__).resolve().parent.parent
 _static_dir = _project_root / "public" / "static" if (_project_root / "public" / "static").exists() else _project_root / "frontend"
 _index_file = _project_root / "public" / "index.html" if (_project_root / "public" / "index.html").exists() else _project_root / "frontend" / "index.html"
 
-app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
+if _static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 @app.get("/")
 def read_root():
-    return FileResponse(str(_index_file))
+    if _index_file.exists():
+        return FileResponse(str(_index_file))
+    return {"status": "ok", "message": "The Last Bite API is running"}
 
 class RecommendRequest(BaseModel):
     location: str = "Bangalore"
@@ -129,7 +135,21 @@ class RecommendRequest(BaseModel):
 @app.get("/health")
 def health():
     ensure_data_loaded()
-    return {"status": "ok", "records_loaded": len(df) if df is not None else 0}
+    if df is not None:
+        return {"status": "ok", "records_loaded": len(df)}
+    return {"status": "error", "load_error": _load_error}
+
+@app.get("/api/debug")
+@app.get("/debug")
+def debug_info():
+    return {
+        "cwd": str(Path.cwd()),
+        "file": str(Path(__file__)),
+        "sys_path": sys.path,
+        "df_loaded": df is not None,
+        "load_error": _load_error,
+        "files_in_cwd": [str(p.relative_to(Path.cwd())) for p in Path.cwd().rglob("*") if p.is_file()][:100],
+    }
 
 @app.get("/api/locations")
 @app.get("/locations")
