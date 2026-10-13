@@ -3,6 +3,17 @@ name = "zomato-bot"
 version = "0.1.0"
 description = "Zomato AI Restaurant Recommender"
 requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.20.0",
+    "pandas>=2.0.0",
+    "pyarrow>=14.0.0",
+    "numpy>=1.24.0",
+    "groq>=0.12.0",
+    "fuzzywuzzy>=0.18.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+]
 
 [tool.vercel]
 entrypoint = "src.api:app"
