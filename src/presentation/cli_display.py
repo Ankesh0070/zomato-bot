@@ -1,7 +1,11 @@
-"""
-CLI Display module.
-Provides functions for rendering recommendations in a terminal environment.
-"""
+import sys
+
+# Ensure UTF-8 encoding on Windows console
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 from src.recommendation.parser import RecommendationResult
 

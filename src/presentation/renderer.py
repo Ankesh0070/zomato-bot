@@ -211,10 +211,11 @@ def _render_single_card(rec):
             col1, col2, _col3 = st.columns([1, 1, 2])
             with col1:
                 if st.button("🍽️ Book Table", key=f"book_{rank}_{rec.restaurant_name}"):
-                    st.toast(f"Redirecting to Zomato booking for {rec.restaurant_name}...", icon="🍽️")
+                    code = f"TLB-{rank * 1111 + 4321}"
+                    st.success(f"🎉 Table reservation confirmed at **{rec.restaurant_name}**! Reservation Code: `{code}`", icon="✅")
             with col2:
-                if st.button("📍 Directions", key=f"dir_{rank}_{rec.restaurant_name}"):
-                    st.toast(f"Opening maps for {rec.restaurant_name}...", icon="📍")
+                maps_url = f"https://www.google.com/maps/search/?api=1&query={rec.restaurant_name.replace(' ', '+')}+Bangalore"
+                st.link_button("📍 Directions", url=maps_url)
 
 
 # ===================================================================

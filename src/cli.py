@@ -33,6 +33,13 @@ def main():
     
     args = parser.parse_args()
 
+    # Ensure UTF-8 output on Windows terminal
+    if sys.platform == "win32":
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
     render_header()
     
     config_warnings = validate_config()
@@ -42,8 +49,19 @@ def main():
 
     print("Loading dataset...")
     try:
-        raw_df = download_dataset()
-        df = preprocess(raw_df)
+        import pandas as pd
+        clean_path = Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet"
+        if clean_path.exists():
+            df = pd.read_parquet(clean_path)
+            if "cuisines_list" in df.columns:
+                df["cuisines_list"] = df["cuisines_list"].apply(
+                    lambda x: [str(c).strip() for c in x if c and str(c).strip() and str(c).lower() != "nan"]
+                    if hasattr(x, "__iter__") and not isinstance(x, str)
+                    else []
+                )
+        else:
+            raw_df = download_dataset()
+            df = preprocess(raw_df)
     except Exception as e:
         render_error(f"Failed to load dataset: {e}")
         return
