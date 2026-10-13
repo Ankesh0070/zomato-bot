@@ -504,8 +504,14 @@ const App = () => {
 
     // Load initial dropdown options (default to Bangalore)
     useEffect(() => {
-        fetch("/api/locations")
-            .then(res => res.json())
+        const fetchEndpoint = (endpoint, altEndpoint) => {
+            return fetch(endpoint).then(res => {
+                if (!res.ok) return fetch(altEndpoint).then(r => r.json());
+                return res.json();
+            });
+        };
+
+        fetchEndpoint("/locations", "/api/locations")
             .then(data => {
                 setLocations(data);
                 if (data && data.length > 0) {
@@ -515,8 +521,7 @@ const App = () => {
             })
             .catch(err => console.error("Error loading locations:", err));
 
-        fetch("/api/cuisines")
-            .then(res => res.json())
+        fetchEndpoint("/cuisines", "/api/cuisines")
             .then(data => setCuisines(data))
             .catch(err => console.error("Error loading cuisines:", err));
     }, []);
@@ -578,17 +583,21 @@ const App = () => {
             preferences: preferences
         };
 
-        fetch("/api/recommend", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(res => {
-            if (!res.ok) {
-                return res.json().then(err => { throw new Error(err.detail || "Server error") });
-            }
-            return res.json();
-        })
+        const postRecommend = (url) => {
+            return fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }).then(res => {
+                if (!res.ok) {
+                    if (url === "/recommend") return postRecommend("/api/recommend");
+                    return res.json().then(err => { throw new Error(err.detail || "Server error") });
+                }
+                return res.json();
+            });
+        };
+
+        postRecommend("/recommend")
         .then(data => {
             if (data.success) {
                 setResults(data);
