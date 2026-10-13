@@ -8,6 +8,10 @@ with retry logic, rate limit handling, and error management.
 import logging
 import time
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from groq.types.chat import ChatCompletionMessageParam
 
 from src.config import LLMConfig
 
@@ -108,13 +112,13 @@ class GroqClient(BaseLLMClient):
 
     def generate(self, user_prompt: str, system_prompt: str = "") -> str:
         """Call Groq API and return the response text."""
+        messages: list[ChatCompletionMessageParam] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_prompt})
+
         try:
             client = self._get_client()
-
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": user_prompt})
 
             response = client.chat.completions.create(
                 model=self.model,
@@ -155,7 +159,7 @@ class GroqClient(BaseLLMClient):
                             logger.info(f"Fallback to {fallback} succeeded.")
                             self.model = fallback
                             return fb_text
-                    except Exception as fb_err:
+                    except Exception as fb_err:  # noqa: BLE001
                         logger.warning(f"Fallback model {fallback} failed: {fb_err}")
 
             if "429" in str(e) or "rate" in error_str or "quota" in error_str:

@@ -7,6 +7,7 @@ DataFrame with normalized text, parsed numbers, and derived columns.
 
 import logging
 import re
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -440,14 +441,14 @@ def get_unique_cuisines(df: pd.DataFrame) -> list[str]:
     return sorted(all_cuisines)
 
 
-def get_dataset_summary(df: pd.DataFrame) -> dict:
+def get_dataset_summary(df: pd.DataFrame) -> dict[str, Any]:
     """
     Generate a summary of the preprocessed dataset.
 
     Returns:
         Dictionary with key statistics.
     """
-    summary = {
+    summary: dict[str, Any] = {
         "total_restaurants": len(df),
         "unique_locations": len(get_unique_locations(df)),
         "unique_cuisines": len(get_unique_cuisines(df)),

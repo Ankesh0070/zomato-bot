@@ -1,7 +1,8 @@
+import io
 import sys
 
 # Ensure UTF-8 encoding on Windows console
-if sys.platform == "win32":
+if sys.platform == "win32" and isinstance(sys.stdout, io.TextIOWrapper):
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:

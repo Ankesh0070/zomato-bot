@@ -23,7 +23,7 @@ def format_for_llm(
     df: pd.DataFrame,
     prefs: UserPreferences,
     max_restaurants: int = MAX_RESTAURANTS_IN_PROMPT,
-) -> dict[str, str]:
+) -> dict[str, int | str]:
     """
     Format the ranked restaurant shortlist and user preferences
     into structured text blocks for the LLM prompt.
@@ -148,7 +148,7 @@ def _format_single_restaurant(row: pd.Series, index: int) -> str:
     return " | ".join(parts)
 
 
-def estimate_token_count(formatted: dict[str, str]) -> int:
+def estimate_token_count(formatted: dict[str, int | str]) -> int:
     """
     Estimate the token count of the formatted content.
 

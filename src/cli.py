@@ -1,4 +1,5 @@
 import argparse
+import io
 import sys
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def main():
     args = parser.parse_args()
 
     # Ensure UTF-8 output on Windows terminal
-    if sys.platform == "win32":
+    if sys.platform == "win32" and isinstance(sys.stdout, io.TextIOWrapper):
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
         except Exception:
