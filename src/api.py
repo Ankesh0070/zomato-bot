@@ -76,8 +76,9 @@ def load_data():
                 else []
             )
 
-        # Pre-compute and cache location/cuisine lists
-        _cached_locations = get_unique_locations(df)
+        # Pre-compute and cache location/cuisine lists with Bangalore as default option
+        raw_locs = get_unique_locations(df)
+        _cached_locations = ["Bangalore"] + [l for l in raw_locs if l.lower() != "bangalore"]
         _cached_cuisines = get_unique_cuisines(df)
         elapsed = (time.perf_counter() - start) * 1000
         logger.info(f"Data loaded successfully: {len(df)} records, {len(_cached_locations)} locations, {len(_cached_cuisines)} cuisines ready in {elapsed:.0f}ms.")
@@ -105,7 +106,7 @@ def read_root():
     return FileResponse(str(_index_file))
 
 class RecommendRequest(BaseModel):
-    location: str
+    location: str = "Bangalore"
     budget: int | None = None
     party_size: int = 2
     cuisine: str | None = None

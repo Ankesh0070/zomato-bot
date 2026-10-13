@@ -142,12 +142,26 @@ def _relax_filters(
             metadata["relaxations"].append(step_name)
             return candidate
 
-    # If nothing works, return whatever we have
+    # If steps on location-filtered subset did not yield enough, relax across the full dataset
+    candidate_all = _try_without_location(df, prefs)
+    if len(candidate_all) >= min_results:
+        metadata["relaxations"].append("location_relaxed")
+        return candidate_all
+    elif len(candidate_all) > 0:
+        metadata["relaxations"].append("location_relaxed")
+        return candidate_all
+
+    # If nothing works, return whatever location matches we have
     if len(result) == 0:
         # Absolute fallback: just filter by location loosely
         result = _filter_by_location_fuzzy(df, prefs.location)
         if len(result) > 0:
             metadata["relaxations"].append("fuzzy_location")
+
+    # If still completely empty, fallback to the top-rated restaurants in df
+    if len(result) == 0 and len(df) > 0:
+        metadata["relaxations"].append("top_overall_fallback")
+        result = df.sort_values(by=CleanColumns.RATING, ascending=False).head(min_results * 2)
 
     return result
 
@@ -156,13 +170,34 @@ def _relax_filters(
 # Individual Filters
 # ---------------------------------------------------------------------------
 def _filter_by_location(df: pd.DataFrame, location: str) -> pd.DataFrame:
-    """Filter by exact location match (case-insensitive)."""
+    """Filter by exact, substring, or city-wide location match (case-insensitive)."""
     col = CleanColumns.LOCATION
-    if col not in df.columns:
+    if col not in df.columns or not location:
         return df
 
-    mask = df[col].str.lower() == location.lower()
-    return df[mask]
+    import re
+    loc_clean = location.strip().lower()
+
+    # Exact match first
+    exact_mask = df[col].astype(str).str.strip().str.lower() == loc_clean
+    if exact_mask.any():
+        # Check if substring match yields significantly more (e.g. Koramangala -> Koramangala 5th block)
+        sub_mask = df[col].astype(str).str.lower().str.contains(r'\b' + re.escape(loc_clean), na=False)
+        if sub_mask.sum() > exact_mask.sum():
+            return df[sub_mask]
+        return df[exact_mask]
+
+    # Substring / word boundary match (e.g. 'HSR' -> 'HSR Layout')
+    sub_mask = df[col].astype(str).str.lower().str.contains(r'\b' + re.escape(loc_clean), na=False)
+    if sub_mask.any() and loc_clean not in ("bangalore", "bengaluru"):
+        return df[sub_mask]
+
+    # City-wide Bangalore check: If searching for Bangalore and there is no single 'Bangalore' row
+    # (because all restaurants are in Bangalore neighborhoods), match all restaurants in the city!
+    if loc_clean in ("bangalore", "bengaluru", "bangalore (all areas)", "all bangalore", "bangalore city"):
+        return df
+
+    return df.head(0)
 
 
 def _filter_by_location_fuzzy(df: pd.DataFrame, location: str) -> pd.DataFrame:

@@ -81,6 +81,8 @@ def validate_and_normalize(
     warnings: list[str] = []
 
     # --- Location ---
+    if known_locations is not None and "Bangalore" not in known_locations:
+        known_locations = ["Bangalore"] + list(known_locations)
     location, loc_warnings = _validate_location(location, known_locations)
     warnings.extend(loc_warnings)
 
@@ -141,6 +143,10 @@ def _validate_location(
 
     # Title case
     location = location.strip().title()
+
+    # City-wide Bangalore direct match (prevents fuzzy matching to 'Central Bangalore')
+    if location.lower() in ("bangalore", "bengaluru", "bangalore (all areas)", "all bangalore", "bangalore city"):
+        return "Bangalore", warnings
 
     # Fuzzy match against known locations
     if known_locations and location not in known_locations:

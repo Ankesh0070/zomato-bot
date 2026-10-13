@@ -85,15 +85,14 @@ const VALID_PREFERENCES = [
 
 // Helper to find closest location to GPS coordinates
 const getClosestLocation = (lat, lng, locationsList) => {
-    if (!locationsList || locationsList.length === 0) return "Koramangala 5Th Block";
+    if (!locationsList || locationsList.length === 0) return "Bangalore";
 
     const blrLat = 12.9716, blrLng = 77.5946;
     const distToBlr = Math.sqrt(Math.pow(lat - blrLat, 2) + Math.pow(lng - blrLng, 2));
 
-    // If outside Bangalore area (> 1.2 degrees distance), default to the premier Bangalore hub
+    // If outside Bangalore area (> 1.2 degrees distance), default to Bangalore
     if (distToBlr > 1.2) {
-        const koramangala = locationsList.find(loc => loc.toLowerCase().includes("koramangala"));
-        return koramangala || locationsList[0];
+        return "Bangalore";
     }
 
     let closestArea = "Koramangala 5Th Block";
@@ -479,7 +478,7 @@ const App = () => {
     const [locations, setLocations] = useState([]);
     const [cuisines, setCuisines] = useState([]);
     
-    const [location, setLocation] = useState("");
+    const [location, setLocation] = useState("Bangalore");
     const [budget, setBudget] = useState(1000);
     const [partySize, setPartySize] = useState(2);
     const [cuisine, setCuisine] = useState("");
@@ -503,16 +502,15 @@ const App = () => {
     const [bookingSuccess, setBookingSuccess] = useState(false);
     const [bookingCode, setBookingCode] = useState("");
 
-    // Load initial dropdown options & trigger geolocation automatically
+    // Load initial dropdown options (default to Bangalore)
     useEffect(() => {
         fetch("/api/locations")
             .then(res => res.json())
             .then(data => {
                 setLocations(data);
                 if (data && data.length > 0) {
-                    setLocation(data[0]);
-                    // Auto Geolocation on launch
-                    detectLocation(data);
+                    const defaultLoc = data.find(l => l.toLowerCase() === "bangalore") || data[0];
+                    setLocation(defaultLoc);
                 }
             })
             .catch(err => console.error("Error loading locations:", err));
@@ -561,7 +559,7 @@ const App = () => {
     const handleSearch = (e) => {
         if (e) e.preventDefault();
         
-        const activeLocation = location || (locations && locations.length > 0 ? locations[0] : "Koramangala 5Th Block");
+        const activeLocation = location || "Bangalore";
         if (!location && activeLocation) {
             setLocation(activeLocation);
         }

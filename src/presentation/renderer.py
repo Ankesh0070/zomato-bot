@@ -54,11 +54,12 @@ def render_sidebar(df: pd.DataFrame) -> dict:
 
         with st.form("preferences_form"):
             # Location
-            locations = get_unique_locations(df)
+            raw_locations = get_unique_locations(df)
+            locations = ["Bangalore"] + [l for l in raw_locations if l.lower() != "bangalore"]
             location = st.selectbox(
                 "📍 Location",
                 options=locations,
-                index=0 if locations else None,
+                index=0,
                 help="Select the area where you want to dine",
             )
 

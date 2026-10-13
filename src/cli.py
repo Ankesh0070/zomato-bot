@@ -25,7 +25,7 @@ from src.recommendation.engine import get_recommendations
 
 def main():
     parser = argparse.ArgumentParser(description="Zomato AI Recommender CLI")
-    parser.add_argument("--location", type=str, required=True, help="Location to search (e.g. Delhi)")
+    parser.add_argument("--location", type=str, default="Bangalore", help="Location to search (default: Bangalore)")
     parser.add_argument("--budget", type=int, default=1000, help="Total budget in Rupees")
     parser.add_argument("--party_size", type=int, default=2, help="Number of people (optional)")
     parser.add_argument("--cuisine", type=str, default=None, help="Cuisine type")
