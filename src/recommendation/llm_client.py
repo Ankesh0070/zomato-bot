@@ -135,28 +135,28 @@ class GroqClient(BaseLLMClient):
             raise
         except Exception as e:
             error_str = str(e).lower()
-            # If model is not found / does not exist, try supported fallback models
-            if "model_not_found" in error_str or "does not exist" in error_str or "404" in str(e):
-                logger.warning(f"Model '{self.model}' not found on Groq. Attempting fallback models...")
-                client = self._get_client()
-                for fallback in FALLBACK_MODELS:
-                    if fallback != self.model:
-                        try:
-                            logger.info(f"Trying fallback model: {fallback}")
-                            fb_resp = client.chat.completions.create(
-                                model=fallback,
-                                messages=messages,
-                                temperature=self.temperature,
-                                max_tokens=self.max_tokens,
-                                response_format={"type": "json_object"},
-                            )
-                            fb_text = fb_resp.choices[0].message.content
-                            if fb_text:
-                                logger.info(f"Fallback to {fallback} succeeded.")
-                                self.model = fallback
-                                return fb_text
-                        except Exception as fb_err:
-                            logger.warning(f"Fallback model {fallback} failed: {fb_err}")
+            logger.warning(f"Groq error with model '{self.model}': {e}. Attempting fallback models...")
+
+            # Attempt supported fallback models for 429 rate limit, 404, or timeout
+            client = self._get_client()
+            for fallback in FALLBACK_MODELS:
+                if fallback != self.model:
+                    try:
+                        logger.info(f"Trying fallback model: {fallback}")
+                        fb_resp = client.chat.completions.create(
+                            model=fallback,
+                            messages=messages,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            response_format={"type": "json_object"},
+                        )
+                        fb_text = fb_resp.choices[0].message.content
+                        if fb_text and fb_text.strip():
+                            logger.info(f"Fallback to {fallback} succeeded.")
+                            self.model = fallback
+                            return fb_text
+                    except Exception as fb_err:
+                        logger.warning(f"Fallback model {fallback} failed: {fb_err}")
 
             if "429" in str(e) or "rate" in error_str or "quota" in error_str:
                 raise LLMRateLimitError(f"Groq rate limit: {e}") from e

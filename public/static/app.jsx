@@ -8,22 +8,29 @@ const { useState, useEffect, useRef } = React;
 
 // Coordinates for mapping locations to map centers
 const AREA_COORDINATES = {
-    "Delhi": [28.6139, 77.2090],
-    "New Delhi": [28.6139, 77.2090],
     "Bangalore": [12.9716, 77.5946],
     "Koramangala": [12.9352, 77.6244],
     "Koramangala 5th Block": [12.9352, 77.6244],
+    "Koramangala 5Th Block": [12.9352, 77.6244],
     "Koramangala 8th Block": [12.9385, 77.6137],
+    "Koramangala 8Th Block": [12.9385, 77.6137],
     "Koramangala 1st Block": [12.9272, 77.6332],
+    "Koramangala 1St Block": [12.9272, 77.6332],
     "Koramangala 6th Block": [12.9385, 77.6228],
+    "Koramangala 6Th Block": [12.9385, 77.6228],
     "Koramangala 7th Block": [12.9302, 77.6190],
+    "Koramangala 7Th Block": [12.9302, 77.6190],
     "Koramangala 4th Block": [12.9328, 77.6294],
+    "Koramangala 4Th Block": [12.9328, 77.6294],
     "Koramangala 2nd Block": [12.9242, 77.6224],
+    "Koramangala 2Nd Block": [12.9242, 77.6224],
     "Koramangala 3rd Block": [12.9281, 77.6253],
+    "Koramangala 3Rd Block": [12.9281, 77.6253],
     "Btm": [12.9166, 77.6101],
     "Btm Layout": [12.9166, 77.6101],
     "Indiranagar": [12.9719, 77.6412],
     "Hsr": [12.9101, 77.6450],
+    "Hsr Layout": [12.9101, 77.6450],
     "Jayanagar": [12.9299, 77.5824],
     "Byresandra, Jayanagar": [12.9299, 77.5824],
     "Jp Nagar": [12.9063, 77.5857],
@@ -41,7 +48,22 @@ const AREA_COORDINATES = {
     "Shanti Nagar": [12.9580, 77.5980],
     "Bommanahalli": [12.9030, 77.6240],
     "Rajajinagar": [12.9915, 77.5467],
-    "Old Airport Road": [12.9592, 77.6534]
+    "Old Airport Road": [12.9592, 77.6534],
+    "Brigade Road": [12.9738, 77.6074],
+    "Church Street": [12.9752, 77.6053],
+    "Commercial Street": [12.9822, 77.6083],
+    "Mg Road": [12.9756, 77.6066],
+    "Lavelle Road": [12.9719, 77.5960],
+    "Residency Road": [12.9698, 77.6006],
+    "Cunningham Road": [12.9868, 77.5938],
+    "Frazer Town": [12.9972, 77.6146],
+    "Ulsoor": [12.9817, 77.6284],
+    "Domlur": [12.9609, 77.6387],
+    "Brookefield": [12.9657, 77.7183],
+    "Kammanahalli": [13.0094, 77.6377],
+    "Banaswadi": [13.0142, 77.6519],
+    "Basaveshwara Nagar": [12.9880, 77.5385],
+    "Vijayanagar": [12.9714, 77.5348]
 };
 
 const VALID_PREFERENCES = [
@@ -63,31 +85,38 @@ const VALID_PREFERENCES = [
 
 // Helper to find closest location to GPS coordinates
 const getClosestLocation = (lat, lng, locationsList) => {
-    const delhiLat = 28.6139, delhiLng = 77.2090;
+    if (!locationsList || locationsList.length === 0) return "Koramangala 5Th Block";
+
     const blrLat = 12.9716, blrLng = 77.5946;
-    
-    const distToDelhi = Math.sqrt(Math.pow(lat - delhiLat, 2) + Math.pow(lng - delhiLng, 2));
     const distToBlr = Math.sqrt(Math.pow(lat - blrLat, 2) + Math.pow(lng - blrLng, 2));
-    
-    if (distToDelhi < distToBlr) {
-        const match = locationsList.find(loc => loc.toLowerCase().includes("delhi"));
-        return match || "Delhi";
+
+    // If outside Bangalore area (> 1.2 degrees distance), default to the premier Bangalore hub
+    if (distToBlr > 1.2) {
+        const koramangala = locationsList.find(loc => loc.toLowerCase().includes("koramangala"));
+        return koramangala || locationsList[0];
     }
-    
-    let closestArea = "Koramangala";
+
+    let closestArea = "Koramangala 5Th Block";
     let minDistance = Infinity;
-    
+
     for (const [area, coords] of Object.entries(AREA_COORDINATES)) {
-        if (area === "Delhi" || area === "New Delhi" || area === "Bangalore") continue;
+        if (area === "Bangalore") continue;
         const dist = Math.sqrt(Math.pow(lat - coords[0], 2) + Math.pow(lng - coords[1], 2));
         if (dist < minDistance) {
             minDistance = dist;
             closestArea = area;
         }
     }
-    
-    const match = locationsList.find(loc => loc.toLowerCase() === closestArea.toLowerCase());
-    return match || locationsList[0];
+
+    // Match against known dataset locations
+    const exact = locationsList.find(loc => loc.toLowerCase() === closestArea.toLowerCase());
+    if (exact) return exact;
+
+    const partial = locationsList.find(loc => 
+        loc.toLowerCase().includes(closestArea.toLowerCase()) || 
+        closestArea.toLowerCase().includes(loc.toLowerCase())
+    );
+    return partial || locationsList[0];
 };
 
 // ==========================================================================
@@ -230,8 +259,22 @@ const MapView = ({ location, recommendations }) => {
             center = matchedKey ? AREA_COORDINATES[matchedKey] : [12.9716, 77.5946];
         }
 
-        // Initialize leaflet map if not already done
-        if (!leafletMapRef.current) {
+        // Clean up previous map instance if it exists
+        if (leafletMapRef.current) {
+            try {
+                leafletMapRef.current.remove();
+            } catch (e) {
+                console.warn("Leaflet cleanup:", e);
+            }
+            leafletMapRef.current = null;
+        }
+
+        // Reset leaflet id if present on the DOM node to prevent already-initialized error
+        if (mapContainerRef.current._leaflet_id) {
+            mapContainerRef.current._leaflet_id = null;
+        }
+
+        try {
             leafletMapRef.current = L.map(mapContainerRef.current, {
                 zoomControl: true,
                 scrollWheelZoom: false
@@ -242,60 +285,68 @@ const MapView = ({ location, recommendations }) => {
             }).addTo(leafletMapRef.current);
 
             markersGroupRef.current = L.featureGroup().addTo(leafletMapRef.current);
-        } else {
-            leafletMapRef.current.setView(center, 14);
-            markersGroupRef.current.clearLayers();
-        }
 
-        // Add pins for recommended restaurants with deterministic offset so they spread
-        const bounds = [];
-        recommendations.forEach((rec, idx) => {
-            const angle = (idx * 2 * Math.PI) / Math.max(recommendations.length, 1);
-            const radius = 0.003; // Spread radius
-            const lat = center[0] + radius * Math.sin(angle);
-            const lng = center[1] + radius * Math.cos(angle);
-            
-            const customIcon = L.divIcon({
-                className: 'custom-map-pin',
-                html: `<div style="
-                    background-color: #cb202d;
-                    color: white;
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 50% 50% 50% 0;
-                    transform: rotate(-45deg);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: 800;
-                    font-size: 0.9rem;
-                    border: 2px solid white;
-                    box-shadow: 0 0 10px rgba(203, 32, 45, 0.6);
-                    margin-left: -16px;
-                    margin-top: -32px;
-                "><span style="transform: rotate(45deg); display: inline-block;">${rec.rank}</span></div>`,
-                iconSize: [32, 32],
-                iconAnchor: [16, 32]
+            // Add pins for recommended restaurants with deterministic offset so they spread
+            const bounds = [];
+            recommendations.forEach((rec, idx) => {
+                const angle = (idx * 2 * Math.PI) / Math.max(recommendations.length, 1);
+                const radius = 0.003; // Spread radius
+                const lat = center[0] + radius * Math.sin(angle);
+                const lng = center[1] + radius * Math.cos(angle);
+                
+                const customIcon = L.divIcon({
+                    className: 'custom-map-pin',
+                    html: `<div style="
+                        background-color: #cb202d;
+                        color: white;
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 50% 50% 50% 0;
+                        transform: rotate(-45deg);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: 800;
+                        font-size: 0.9rem;
+                        border: 2px solid white;
+                        box-shadow: 0 0 10px rgba(203, 32, 45, 0.6);
+                        margin-left: -16px;
+                        margin-top: -32px;
+                    "><span style="transform: rotate(45deg); display: inline-block;">${rec.rank}</span></div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32]
+                });
+
+                const marker = L.marker([lat, lng], { icon: customIcon }).addTo(markersGroupRef.current);
+                marker.bindPopup(`
+                    <div class="map-popup-title">${rec.restaurant_name}</div>
+                    <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
+                        <span class="map-popup-rating" style="background:#10b981; color:#fff; font-size:0.75rem; padding: 2px 5px; border-radius:4px; font-weight:700;">⭐ ${rec.rating.toFixed(1)}</span>
+                        <span class="map-popup-cuisine" style="font-size:0.8rem; color:#6b7194;">${rec.cuisine}</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6b7194; margin-top: 4px;">
+                        Cost: ${rec.estimated_cost}
+                    </div>
+                `);
+                bounds.push([lat, lng]);
             });
 
-            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(markersGroupRef.current);
-            marker.bindPopup(`
-                <div class="map-popup-title">${rec.restaurant_name}</div>
-                <div style="margin: 4px 0; display: flex; align-items: center; gap: 6px;">
-                    <span class="map-popup-rating" style="background:#10b981; color:#fff; font-size:0.75rem; padding: 2px 5px; border-radius:4px; font-weight:700;">⭐ ${rec.rating.toFixed(1)}</span>
-                    <span class="map-popup-cuisine" style="font-size:0.8rem; color:#6b7194;">${rec.cuisine}</span>
-                </div>
-                <div style="font-size: 0.75rem; color: #6b7194; margin-top: 4px;">
-                    Cost: ${rec.estimated_cost}
-                </div>
-            `);
-            bounds.push([lat, lng]);
-        });
-
-        // Zoom map to fit all markers
-        if (bounds.length > 0) {
-            leafletMapRef.current.fitBounds(bounds, { padding: [40, 40] });
+            // Zoom map to fit all markers
+            if (bounds.length > 0) {
+                leafletMapRef.current.fitBounds(bounds, { padding: [40, 40] });
+            }
+        } catch (mapErr) {
+            console.error("Map initialization failed:", mapErr);
         }
+
+        return () => {
+            if (leafletMapRef.current) {
+                try {
+                    leafletMapRef.current.remove();
+                } catch (e) {}
+                leafletMapRef.current = null;
+            }
+        };
     }, [location, recommendations]);
 
     return (
@@ -408,13 +459,11 @@ const RecommendationCard = ({ rec, onBook }) => {
 
             {/* Actions */}
             <div className="rec-card-actions">
-                {rec.book_table && (
-                    <button className="action-btn btn-primary" onClick={() => onBook(rec.restaurant_name)}>
-                        <Icon name="calendar" style={{ width: '16px', height: '16px' }} />
-                        Book Table
-                    </button>
-                )}
-                <button className="action-btn" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rec.restaurant_name + ' ' + rec.cuisine)}`, '_blank')}>
+                <button className="action-btn btn-primary" onClick={() => onBook(rec.restaurant_name)}>
+                    <Icon name="calendar" style={{ width: '16px', height: '16px' }} />
+                    Book Table
+                </button>
+                <button className="action-btn" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(rec.restaurant_name + ' ' + (rec.cuisine || '') + ' Bangalore')}`, '_blank')}>
                     <Icon name="navigation" style={{ width: '16px', height: '16px' }} />
                     Get Directions
                 </button>
@@ -512,13 +561,18 @@ const App = () => {
     const handleSearch = (e) => {
         if (e) e.preventDefault();
         
+        const activeLocation = location || (locations && locations.length > 0 ? locations[0] : "Koramangala 5Th Block");
+        if (!location && activeLocation) {
+            setLocation(activeLocation);
+        }
+
         setSearching(true);
         setErrorMsg("");
         setWarnings([]);
         setResults(null);
 
         const payload = {
-            location: location,
+            location: activeLocation,
             budget: parseInt(budget) || null,
             party_size: partySize,
             cuisine: cuisine || null,

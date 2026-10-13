@@ -432,7 +432,7 @@ def get_unique_cuisines(df: pd.DataFrame) -> list[str]:
 
     all_cuisines = set()
     for cuisine_list in df[col].dropna():
-        if isinstance(cuisine_list, list):
+        if hasattr(cuisine_list, "__iter__") and not isinstance(cuisine_list, str):
             for c in cuisine_list:
                 if c and str(c).strip() and str(c).lower() != "nan":
                     all_cuisines.add(str(c).strip())

@@ -128,11 +128,11 @@ def _relax_filters(
     # Start with location only
     result = _filter_by_location(df, prefs.location)
 
-    # Try relaxation steps
+    # Try relaxation steps: prioritize preserving user's cuisine preference
     relaxation_steps = [
-        ("cuisine_relaxed", lambda r: _try_without_cuisine(r, prefs)),
-        ("budget_expanded", lambda r: _try_expanded_budget(r, prefs)),
         ("rating_lowered", lambda r: _try_lower_rating(r, prefs)),
+        ("budget_expanded", lambda r: _try_expanded_budget(r, prefs)),
+        ("cuisine_relaxed", lambda r: _try_without_cuisine(r, prefs)),
         ("location_relaxed", lambda _: _try_without_location(df, prefs)),
     ]
 
@@ -220,10 +220,17 @@ def _filter_by_cuisine(df: pd.DataFrame, cuisine: str) -> pd.DataFrame:
             return df[mask]
         return df
 
-    cuisine_lower = cuisine.lower()
+    cuisine_lower = cuisine.lower().strip()
     mask = df[col].apply(
-        lambda x: any(c.lower() == cuisine_lower for c in x) if isinstance(x, list) else False
+        lambda x: any(c.lower().strip() == cuisine_lower for c in x)
+        if hasattr(x, "__iter__") and not isinstance(x, str)
+        else False
     )
+    # If no match in list, also fallback to substring check on raw cuisines text
+    if not mask.any() and CleanColumns.CUISINES in df.columns:
+        import re
+        mask = df[CleanColumns.CUISINES].astype(str).str.contains(re.escape(cuisine), case=False, na=False)
+
     return df[mask]
 
 
@@ -255,31 +262,34 @@ def _try_without_cuisine(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFra
 
 
 def _try_expanded_budget(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFrame:
-    """Try expanding budget by 50%."""
-    if not prefs.budget:
-        return df
+    """Try expanding budget by 50% while preserving cuisine if specified."""
+    result = df
+    if prefs.cuisine:
+        cuisine_result = _filter_by_cuisine(result, prefs.cuisine)
+        if len(cuisine_result) > 0:
+            result = cuisine_result
 
-    col = CleanColumns.COST_FOR_TWO
-    if col not in df.columns:
-        return df
+    if prefs.budget:
+        budget = prefs.budget
+        if isinstance(budget, str):
+            tier_to_budget = {"low": 400, "medium": 1000, "high": 2500}
+            resolved = tier_to_budget.get(budget.strip().lower())
+            if resolved is not None:
+                budget = resolved
+            else:
+                try:
+                    budget = int(float(budget.strip().replace("₹", "").replace(",", "")))
+                except (ValueError, TypeError):
+                    budget = None
 
-    budget = prefs.budget
-    if isinstance(budget, str):
-        tier_to_budget = {"low": 400, "medium": 1000, "high": 2500}
-        resolved = tier_to_budget.get(budget.strip().lower())
-        if resolved is not None:
-            budget = resolved
-        else:
-            try:
-                budget = int(float(budget.strip().replace("₹", "").replace(",", "")))
-            except (ValueError, TypeError):
-                return df
-
-    expanded_budget = int(budget * 1.5)
-    max_cost_for_two = (expanded_budget / max(1, prefs.party_size)) * 2
-    
-    mask = df[col] <= max_cost_for_two
-    result = df[mask]
+        if budget is not None:
+            col = CleanColumns.COST_FOR_TWO
+            if col in result.columns:
+                expanded_budget = int(budget * 1.5)
+                max_cost_for_two = (expanded_budget / max(1, prefs.party_size)) * 2
+                mask = result[col] <= max_cost_for_two
+                if mask.any():
+                    result = result[mask]
 
     # Also apply rating filter
     if prefs.min_rating > 0:
@@ -291,16 +301,23 @@ def _try_expanded_budget(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFra
 
 
 def _try_lower_rating(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFrame:
-    """Try lowering the minimum rating by 0.5."""
+    """Try lowering the minimum rating by 0.5 while preserving cuisine if specified."""
     lower_rating = max(0.0, prefs.min_rating - 0.5)
     result = df
+
+    if prefs.cuisine:
+        cuisine_result = _filter_by_cuisine(result, prefs.cuisine)
+        if len(cuisine_result) > 0:
+            result = cuisine_result
 
     if prefs.budget:
         budget_result = _filter_by_budget(result, prefs.budget, prefs.party_size)
         if len(budget_result) > 0:
             result = budget_result
 
-    result = _filter_by_rating(result, lower_rating)
+    rating_result = _filter_by_rating(result, lower_rating)
+    if len(rating_result) > 0:
+        result = rating_result
     return result
 
 

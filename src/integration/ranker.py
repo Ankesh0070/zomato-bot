@@ -14,12 +14,15 @@ import pandas as pd
 from src.config import AppConfig
 from src.data.schema import CleanColumns
 
+from src.input.models import UserPreferences
+
 logger = logging.getLogger("zomato_recommender.integration.ranker")
 
 
 def rank_and_select(
     df: pd.DataFrame,
     top_k: int | None = None,
+    prefs: UserPreferences | None = None,
 ) -> pd.DataFrame:
     """
     Rank restaurants by composite score and return the top-K.
@@ -27,18 +30,12 @@ def rank_and_select(
     The composite score balances:
         - Rating (primary signal)
         - Popularity (log of votes — diminishing returns)
-
-    Score formula:
-        score = rating * log2(votes + 2)
-
-    Using log2(votes + 2) ensures:
-        - Restaurants with 0 votes get a non-zero multiplier (~1.0)
-        - High vote counts have diminishing influence
-        - Rating remains the dominant factor
+        - User preference affinity (cuisine match, dining tags, options)
 
     Args:
         df: Filtered restaurant DataFrame.
         top_k: Number of top candidates to return. Defaults to AppConfig.TOP_K_CANDIDATES.
+        prefs: Optional user preferences to calculate personalized bonus.
 
     Returns:
         Top-K ranked DataFrame sorted by score (descending).
@@ -52,8 +49,8 @@ def rank_and_select(
 
     df = df.copy()
 
-    # Calculate composite score
-    df["_score"] = df.apply(_compute_score, axis=1)
+    # Calculate composite score with preferences affinity
+    df["_score"] = df.apply(lambda row: _compute_score(row, prefs), axis=1)
 
     # Sort by score (descending), then by name (ascending) for determinism
     df = df.sort_values(
@@ -77,7 +74,7 @@ def rank_and_select(
     return result
 
 
-def _compute_score(row: pd.Series) -> float:
+def _compute_score(row: pd.Series, prefs: UserPreferences | None = None) -> float:
     """
     Compute the composite ranking score for a single restaurant.
 
@@ -101,6 +98,48 @@ def _compute_score(row: pd.Series) -> float:
     # Composite score: rating * log2(votes + 2)
     popularity_factor = math.log2(votes + 2)
     score = rating * popularity_factor
+
+    # Personalization bonus based on user preferences
+    if prefs is not None:
+        bonus = 0.0
+        # Cuisine match bonus
+        if prefs.cuisine:
+            cuisines_val = row.get(CleanColumns.CUISINES, "")
+            cuisines_list_val = row.get(CleanColumns.CUISINES_LIST, [])
+            c_low = prefs.cuisine.lower().strip()
+            if hasattr(cuisines_list_val, "__iter__") and not isinstance(cuisines_list_val, str):
+                if any(str(c).lower().strip() == c_low for c in cuisines_list_val):
+                    bonus += 3.0
+            elif c_low in str(cuisines_val).lower():
+                bonus += 3.0
+
+        # Additional preference tags bonus
+        if prefs.preferences:
+            combined_text = (
+                f"{row.get(CleanColumns.RESTAURANT_TYPE, '')} "
+                f"{row.get(CleanColumns.CUISINES, '')} "
+                f"{row.get('dish_liked', '')}"
+            ).lower()
+
+            for p in prefs.preferences:
+                p_clean = p.lower().strip()
+                if p_clean in combined_text:
+                    bonus += 1.5
+                elif p_clean == "vegetarian" and "veg" in combined_text:
+                    bonus += 1.5
+                elif p_clean == "buffet" and "buffet" in combined_text:
+                    bonus += 1.5
+                elif p_clean in ("fine dining", "luxury") and "fine dining" in combined_text:
+                    bonus += 2.0
+                elif p_clean == "quick service" and "quick" in combined_text:
+                    bonus += 1.5
+
+        if bool(row.get(CleanColumns.ONLINE_ORDER, False)):
+            bonus += 0.5
+        if bool(row.get(CleanColumns.BOOK_TABLE, False)):
+            bonus += 0.8
+
+        score += bonus
 
     return round(score, 4)
 

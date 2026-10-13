@@ -63,7 +63,20 @@ logger = logging.getLogger("zomato_recommender.main")
 @st.cache_data(show_spinner=False)
 def load_and_preprocess():
     """Download, cache, and preprocess the Zomato dataset."""
-    logger.info("Loading dataset...")
+    import pandas as pd
+    clean_path = Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet"
+    if clean_path.exists():
+        logger.info(f"Loading preprocessed dataset from {clean_path}...")
+        df = pd.read_parquet(clean_path)
+        if "cuisines_list" in df.columns:
+            df["cuisines_list"] = df["cuisines_list"].apply(
+                lambda x: [str(c).strip() for c in x if c and str(c).strip() and str(c).lower() != "nan"]
+                if hasattr(x, "__iter__") and not isinstance(x, str)
+                else []
+            )
+        return df
+
+    logger.info("Downloading dataset from Hugging Face...")
     raw_df = download_dataset()
     logger.info(f"Raw dataset: {len(raw_df)} rows")
 

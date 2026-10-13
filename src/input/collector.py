@@ -112,7 +112,7 @@ class PreferenceCollector:
 
         cuisine_counts: dict[str, int] = {}
         for cuisines in self._df[CleanColumns.CUISINES_LIST].dropna():
-            if isinstance(cuisines, list):
+            if hasattr(cuisines, "__iter__") and not isinstance(cuisines, str):
                 for c in cuisines:
                     cuisine_counts[c] = cuisine_counts.get(c, 0) + 1
 

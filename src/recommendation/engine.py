@@ -151,7 +151,7 @@ def get_recommendations(
 
     # Step 2: Rank
     logger.info("Step 2/4: Ranking candidates...")
-    ranked = rank_and_select(filtered, top_k=AppConfig.TOP_K_CANDIDATES)
+    ranked = rank_and_select(filtered, top_k=AppConfig.TOP_K_CANDIDATES, prefs=prefs)
     logger.info(f"  -> Top {len(ranked)} candidates selected")
 
     # Step 3: Format + Prompt

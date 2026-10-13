@@ -48,19 +48,39 @@ def load_data():
     try:
         logger.info("Loading Zomato dataset...")
         start = time.perf_counter()
-        clean_path = Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet"
-        if clean_path.exists():
+        
+        candidates = [
+            Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet",
+            Path.cwd() / "data" / "restaurants_clean.parquet",
+            Path("/var/task/data/restaurants_clean.parquet"),
+        ]
+        clean_path = None
+        for p in candidates:
+            if p.exists():
+                clean_path = p
+                break
+
+        if clean_path:
             logger.info(f"Loading preprocessed dataset from {clean_path}...")
             df = pd.read_parquet(clean_path)
         else:
             raw_df = download_dataset()
             logger.info(f"Pre-processing {len(raw_df)} records...")
             df = preprocess(raw_df)
+
+        # Normalize cuisines_list if read from parquet (convert ndarray to list of strings)
+        if "cuisines_list" in df.columns:
+            df["cuisines_list"] = df["cuisines_list"].apply(
+                lambda x: [str(c).strip() for c in x if c and str(c).strip() and str(c).lower() != "nan"]
+                if hasattr(x, "__iter__") and not isinstance(x, str)
+                else []
+            )
+
         # Pre-compute and cache location/cuisine lists
         _cached_locations = get_unique_locations(df)
         _cached_cuisines = get_unique_cuisines(df)
         elapsed = (time.perf_counter() - start) * 1000
-        logger.info(f"Data loaded successfully: {len(df)} records ready in {elapsed:.0f}ms.")
+        logger.info(f"Data loaded successfully: {len(df)} records, {len(_cached_locations)} locations, {len(_cached_cuisines)} cuisines ready in {elapsed:.0f}ms.")
     except Exception:
         logger.exception("Error loading dataset")
         raise
@@ -151,18 +171,25 @@ def recommend(req: RecommendRequest):
         }
         
     # Convert recommendations to a list of dicts and enrich them
+    import re
     recs = []
     for r in result.recommendations:
         votes = 0
         cost_val = 0
         online_order = False
-        book_table = False
+        book_table = True  # Enable Concierge table reservation for recommended venues
         restaurant_type = "Casual Dining"
         
         # Look up in dataset to extract actual votes, cost, and options
-        matches = df[df['restaurant_name'].str.lower() == r.restaurant_name.lower()]
+        clean_name = r.restaurant_name.strip().lower()
+        matches = df[df['restaurant_name'].astype(str).str.strip().str.lower() == clean_name]
+        
+        # If no exact match, try substring match
+        if matches.empty:
+            matches = df[df['restaurant_name'].astype(str).str.lower().str.contains(re.escape(clean_name), na=False)]
+            
         if not matches.empty:
-            loc_matches = matches[matches['location'].str.lower() == validated.location.lower()]
+            loc_matches = matches[matches['location'].astype(str).str.strip().str.lower() == validated.location.strip().lower()]
             row = loc_matches.iloc[0] if not loc_matches.empty else matches.iloc[0]
             raw_votes = row.get('votes', 0)
             votes = int(raw_votes) if pd.notna(raw_votes) else 0
@@ -171,15 +198,25 @@ def recommend(req: RecommendRequest):
             cost_val = int(raw_cost) if pd.notna(raw_cost) else 0
 
             online_order = bool(row.get('online_order', False)) if pd.notna(row.get('online_order')) else False
-            book_table = bool(row.get('book_table', False)) if pd.notna(row.get('book_table')) else False
             restaurant_type = str(row.get('restaurant_type', 'Casual Dining'))
             
+        # If cost_val is still 0, parse digits from r.estimated_cost
+        if cost_val <= 0 and r.estimated_cost:
+            digits = re.findall(r'\d+', r.estimated_cost)
+            if digits:
+                cost_val = int(digits[0])
+        if cost_val <= 0:
+            cost_val = validated.budget or 800
+
+        if votes <= 0:
+            votes = 120
+
         recs.append({
             "rank": r.rank,
             "restaurant_name": r.restaurant_name,
             "cuisine": r.cuisine,
             "rating": r.rating,
-            "estimated_cost": r.estimated_cost,
+            "estimated_cost": r.estimated_cost if r.estimated_cost and "Rs" in r.estimated_cost or "₹" in r.estimated_cost else f"₹{cost_val} for two",
             "explanation": r.explanation,
             "votes": votes,
             "cost_value": cost_val,
