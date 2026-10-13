@@ -228,7 +228,7 @@ def _validate_cuisine(
     """Validate and normalize cuisine input."""
     warnings: list[str] = []
 
-    if cuisine is None or str(cuisine).strip() == "":
+    if cuisine is None or cuisine.strip() == "":
         return None, warnings
 
     cuisine = _sanitize_text(cuisine).strip().title()
@@ -294,7 +294,7 @@ def _validate_preferences(preferences: list[str]) -> list[str]:
     """Sanitize and limit preference tags."""
     cleaned = []
     for pref in preferences:
-        pref = _sanitize_text(str(pref)).strip().lower()
+        pref = _sanitize_text(pref).strip().lower()
         if pref and len(pref) <= MAX_TEXT_LENGTH:
             cleaned.append(pref)
 
@@ -314,8 +314,6 @@ def _sanitize_text(text: str) -> str:
     """
     if not text:
         return ""
-
-    text = str(text)
 
     # Remove HTML tags
     text = re.sub(r"<[^>]+>", "", text)

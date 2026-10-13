@@ -2,7 +2,10 @@
   "version": 2,
   "functions": {
     "api/index.py": {
-      "includeFiles": "data/restaurants_clean.parquet",
+      "includeFiles": [
+        "src/**",
+        "data/restaurants_clean.parquet"
+      ],
       "maxDuration": 60,
       "memory": 1024
     }

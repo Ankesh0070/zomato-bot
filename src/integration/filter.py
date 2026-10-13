@@ -184,13 +184,13 @@ def _filter_by_location(df: pd.DataFrame, location: str) -> pd.DataFrame:
         # Check if substring match yields significantly more (e.g. Koramangala -> Koramangala 5th block)
         sub_mask = df[col].astype(str).str.lower().str.contains(r'\b' + re.escape(loc_clean), na=False)
         if sub_mask.sum() > exact_mask.sum():
-            return df[sub_mask]
-        return df[exact_mask]
+            return df.loc[sub_mask]
+        return df.loc[exact_mask]
 
     # Substring / word boundary match (e.g. 'HSR' -> 'HSR Layout')
     sub_mask = df[col].astype(str).str.lower().str.contains(r'\b' + re.escape(loc_clean), na=False)
     if sub_mask.any() and loc_clean not in ("bangalore", "bengaluru"):
-        return df[sub_mask]
+        return df.loc[sub_mask]
 
     # City-wide Bangalore check: If searching for Bangalore and there is no single 'Bangalore' row
     # (because all restaurants are in Bangalore neighborhoods), match all restaurants in the city!
@@ -210,7 +210,7 @@ def _filter_by_location_fuzzy(df: pd.DataFrame, location: str) -> pd.DataFrame:
     match_result = fuzz_process.extractOne(location, locations)
     if match_result and match_result[1] >= 60:
         mask = df[col] == match_result[0]
-        return df[mask]
+        return df.loc[mask]
 
     return df.head(0)  # Empty DataFrame
 
@@ -238,7 +238,7 @@ def _filter_by_budget(df: pd.DataFrame, budget: int | str, party_size: int = 2) 
     max_cost_for_two = (budget / max(1, party_size)) * 2
     
     mask = df[col] <= max_cost_for_two
-    return df[mask]
+    return df.loc[mask]
 
 
 def _filter_by_cuisine(df: pd.DataFrame, cuisine: str) -> pd.DataFrame:
@@ -252,7 +252,7 @@ def _filter_by_cuisine(df: pd.DataFrame, cuisine: str) -> pd.DataFrame:
         str_col = CleanColumns.CUISINES
         if str_col in df.columns:
             mask = df[str_col].str.contains(cuisine, case=False, na=False)
-            return df[mask]
+            return df.loc[mask]
         return df
 
     cuisine_lower = cuisine.lower().strip()
@@ -262,11 +262,11 @@ def _filter_by_cuisine(df: pd.DataFrame, cuisine: str) -> pd.DataFrame:
         else False
     )
     # If no match in list, also fallback to substring check on raw cuisines text
-    if not mask.any() and CleanColumns.CUISINES in df.columns:
+    if not bool(mask.any()) and CleanColumns.CUISINES in df.columns:
         import re
         mask = df[CleanColumns.CUISINES].astype(str).str.contains(re.escape(cuisine), case=False, na=False)
 
-    return df[mask]
+    return df.loc[mask]
 
 
 def _filter_by_rating(df: pd.DataFrame, min_rating: float) -> pd.DataFrame:
@@ -276,7 +276,7 @@ def _filter_by_rating(df: pd.DataFrame, min_rating: float) -> pd.DataFrame:
         return df
 
     mask = df[col] >= min_rating
-    return df[mask]
+    return df.loc[mask]
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ def _try_expanded_budget(df: pd.DataFrame, prefs: UserPreferences) -> pd.DataFra
                 max_cost_for_two = (expanded_budget / max(1, prefs.party_size)) * 2
                 mask = result[col] <= max_cost_for_two
                 if mask.any():
-                    result = result[mask]
+                    result = result.loc[mask]
 
     # Also apply rating filter
     if prefs.min_rating > 0:
