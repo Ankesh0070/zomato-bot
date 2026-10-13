@@ -53,12 +53,24 @@ def load_data():
             Path(__file__).resolve().parent.parent / "data" / "restaurants_clean.parquet",
             Path.cwd() / "data" / "restaurants_clean.parquet",
             Path("/var/task/data/restaurants_clean.parquet"),
+            Path("/var/task/restaurants_clean.parquet"),
+            Path.cwd() / "restaurants_clean.parquet",
+            Path(__file__).resolve().parent / "data" / "restaurants_clean.parquet",
         ]
         clean_path = None
         for p in candidates:
             if p.exists():
                 clean_path = p
                 break
+
+        if not clean_path:
+            # Search candidate directories recursively
+            for base in [Path.cwd(), Path("/var/task"), Path(__file__).resolve().parent.parent]:
+                if base.exists():
+                    matches = list(base.glob("**/restaurants_clean.parquet"))
+                    if matches:
+                        clean_path = matches[0]
+                        break
 
         if clean_path:
             logger.info(f"Loading preprocessed dataset from {clean_path}...")
@@ -114,11 +126,13 @@ class RecommendRequest(BaseModel):
     preferences: list[str] = Field(default_factory=list)
 
 @app.get("/api/health")
+@app.get("/health")
 def health():
     ensure_data_loaded()
     return {"status": "ok", "records_loaded": len(df) if df is not None else 0}
 
 @app.get("/api/locations")
+@app.get("/locations")
 def get_locations():
     ensure_data_loaded()
     if _cached_locations is None:
@@ -126,6 +140,7 @@ def get_locations():
     return _cached_locations
 
 @app.get("/api/cuisines")
+@app.get("/cuisines")
 def get_cuisines():
     ensure_data_loaded()
     if _cached_cuisines is None:
@@ -133,6 +148,7 @@ def get_cuisines():
     return _cached_cuisines
 
 @app.post("/api/recommend")
+@app.post("/recommend")
 def recommend(req: RecommendRequest):
     ensure_data_loaded()
     if df is None:

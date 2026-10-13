@@ -35,6 +35,8 @@ try:
     for key in st.secrets:
         if key not in os.environ:
             os.environ[key] = str(st.secrets[key])
+        if key.upper() not in os.environ:
+            os.environ[key.upper()] = str(st.secrets[key])
 except Exception:
     pass
 

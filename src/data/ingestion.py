@@ -22,7 +22,11 @@ CACHE_FILENAME = "zomato_dataset.parquet"
 def _get_cache_path() -> Path:
     """Return the full path to the cached Parquet file."""
     cache_dir = DatasetConfig.CACHE_DIR
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        cache_dir = Path("/tmp/data")
+        cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir / CACHE_FILENAME
 
 
